@@ -32,6 +32,7 @@ pub struct Building<T> {
 pub struct Completed {
     pub lin: Vec<LinearizationItem<Resolved>>,
     pub id_mapping: HashMap<usize, usize>,
+    pub scope_mapping: HashMap<Vec<ScopeId>, Vec<usize>>,
 }
 
 pub trait ResolutionState {}
@@ -53,6 +54,7 @@ pub struct LinearizationItem<ResolutionState> {
     pub pos: TermPos,
     pub ty: ResolutionState,
     pub kind: TermKind,
+    scope: Vec<ScopeId>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -79,15 +81,16 @@ pub trait Linearizer<L, S> {
             state: Completed {
                 lin: Vec::new(),
                 id_mapping: HashMap::new(),
+                scope_mapping: HashMap::new(),
             },
         }
     }
-    fn scope(&self) -> Self;
+    fn scope(&self, branch: ScopeId) -> Self;
 }
 
 pub struct StubHost<L>(PhantomData<L>);
 impl<L, S> Linearizer<L, S> for StubHost<L> {
-    fn scope(&self) -> Self {
+    fn scope(&self, _: ScopeId) -> Self {
         StubHost::new()
     }
 }
@@ -101,20 +104,39 @@ impl<L> StubHost<L> {
 pub type Environment = GenericEnvironment<Ident, usize>;
 pub struct AnalysisHost {
     env: Environment,
+    scope: Vec<ScopeId>,
 }
 
 impl AnalysisHost {
     pub fn new() -> Self {
         AnalysisHost {
             env: Environment::new(),
+            scope: Vec::new(),
         }
     }
 }
 
-impl Linearizer<Vec<LinearizationItem<Unresolved>>, UnifTable> for AnalysisHost {
+trait ScopeIdElem: Clone + Eq {}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub enum ScopeId {
+    Left,
+    Right,
+    Choice(usize),
+}
+
+impl ScopeIdElem for ScopeId {}
+
+#[derive(Default)]
+pub struct BuildingResource {
+    linearization: Vec<LinearizationItem<Unresolved>>,
+    scope: HashMap<Vec<ScopeId>, Vec<usize>>,
+}
+
+impl Linearizer<BuildingResource, UnifTable> for AnalysisHost {
     fn add_term(
         &mut self,
-        lin: &mut Linearization<Building<Vec<LinearizationItem<Unresolved>>>>,
+        lin: &mut Linearization<Building<BuildingResource>>,
         term: &Term,
         pos: TermPos,
         ty: TypeWrapper,
@@ -123,14 +145,16 @@ impl Linearizer<Vec<LinearizationItem<Unresolved>>, UnifTable> for AnalysisHost 
             eprintln!("{:?}", term);
             return;
         }
-        let id = lin.state.resource.len();
+        let id = lin.state.resource.linearization.len();
         match term {
             Term::Let(ident, definition, _) => {
-                self.env.insert(ident.to_owned(), lin.state.resource.len());
+                self.env
+                    .insert(ident.to_owned(), lin.state.resource.linearization.len());
                 lin.push(LinearizationItem {
                     id,
                     ty,
                     pos: definition.pos,
+                    scope: self.scope.clone(),
                     kind: TermKind::Declaration(ident.to_string(), Vec::new()),
                 });
             }
@@ -140,6 +164,7 @@ impl Linearizer<Vec<LinearizationItem<Unresolved>>, UnifTable> for AnalysisHost 
                     id,
                     pos,
                     ty,
+                    scope: self.scope.clone(),
                     kind: TermKind::Usage(parent),
                 });
                 if let Some(parent) = parent {
@@ -150,6 +175,7 @@ impl Linearizer<Vec<LinearizationItem<Unresolved>>, UnifTable> for AnalysisHost 
                 id,
                 pos,
                 ty,
+                scope: self.scope.clone(),
                 kind: TermKind::Structure,
             }),
         }
@@ -157,10 +183,10 @@ impl Linearizer<Vec<LinearizationItem<Unresolved>>, UnifTable> for AnalysisHost 
 
     fn linearize(
         self,
-        lin: Linearization<Building<Vec<LinearizationItem<Unresolved>>>>,
+        lin: Linearization<Building<BuildingResource>>,
         extra: &UnifTable,
     ) -> Linearization<Completed> {
-        let mut lin_ = lin.state.resource;
+        let mut lin_ = lin.state.resource.linearization;
         eprintln!("linearizing");
         lin_.sort_by_key(|item| match item.pos {
             TermPos::Original(span) => (span.src_id, span.start),
@@ -182,11 +208,18 @@ impl Linearizer<Vec<LinearizationItem<Unresolved>>, UnifTable> for AnalysisHost 
         let lin_ = lin_
             .into_iter()
             .map(
-                |LinearizationItem { id, pos, ty, kind }| LinearizationItem {
+                |LinearizationItem {
+                     id,
+                     pos,
+                     ty,
+                     kind,
+                     scope,
+                 }| LinearizationItem {
                     ty: to_type(extra, ty),
                     id,
                     pos,
                     kind,
+                    scope,
                 },
             )
             .collect();
@@ -194,25 +227,44 @@ impl Linearizer<Vec<LinearizationItem<Unresolved>>, UnifTable> for AnalysisHost 
         Linearization::completed(Completed {
             lin: lin_,
             id_mapping,
+            scope_mapping: lin.state.resource.scope,
         })
     }
 
-    fn scope(&self) -> Self {
+    fn scope(&self, scope_id: ScopeId) -> Self {
+        let mut scope = self.scope.clone();
+        scope.push(scope_id);
+
         AnalysisHost {
+            scope,
             env: self.env.clone(),
         }
     }
 }
 
-impl Linearization<Building<Vec<LinearizationItem<Unresolved>>>> {
+impl Linearization<Building<BuildingResource>> {
     fn push(&mut self, item: LinearizationItem<Unresolved>) {
-        self.state.resource.push(item);
+        self.state
+            .resource
+            .scope
+            .remove(&item.scope)
+            .map(|mut s| {
+                s.push(item.id);
+                s
+            })
+            .or_else(|| Some(vec![item.id]))
+            .into_iter()
+            .for_each(|l| {
+                self.state.resource.scope.insert(item.scope.clone(), l);
+            });
+        self.state.resource.linearization.push(item);
     }
 
     fn add_usage(&mut self, decl: usize, usage: usize) {
         match self
             .state
             .resource
+            .linearization
             .get_mut(decl)
             .expect("Coundt find parent")
             .kind
@@ -221,5 +273,33 @@ impl Linearization<Building<Vec<LinearizationItem<Unresolved>>>> {
             TermKind::Usage(_) => unreachable!(),
             TermKind::Declaration(_, ref mut usages) => usages.push(usage),
         };
+    }
+}
+
+impl Linearization<Completed> {
+    pub fn get_item(&self, id: usize) -> Option<&LinearizationItem<Resolved>> {
+        self.state
+            .id_mapping
+            .get(&id)
+            .and_then(|index| self.state.lin.get(*index))
+    }
+
+    pub fn get_in_scope(
+        &self,
+        LinearizationItem { scope, .. }: &LinearizationItem<Resolved>,
+    ) -> Vec<&LinearizationItem<Resolved>> {
+        (0..scope.len())
+            .into_iter()
+            .map(|end| &scope[..end])
+            .flat_map(|scope| {
+                self.state
+                    .scope_mapping
+                    .get(scope)
+                    .map_or_else(|| Vec::new(), Clone::clone)
+            })
+            .map(|id| self.get_item(id))
+            .filter(Option::is_some)
+            .map(Option::unwrap)
+            .collect()
     }
 }
