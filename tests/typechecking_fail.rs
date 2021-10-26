@@ -199,12 +199,7 @@ fn polymorphic_row_constraints() {
 
 #[test]
 fn dynamic_row_tail() {
-    // Currently, typechecking is conservative wrt the dynamic row type, meaning it can't
-    // convert to a less precise type with a dynamic tail.
-    assert_typecheck_fails!("{a = 1, b = 2} : {a: Num | Dyn}");
-    assert_typecheck_fails!("{a = 1} : {a: Num | Dyn}");
-    assert_typecheck_fails!("({a = 1} | {a: Num | Dyn}) : {a: Num}");
-    assert_typecheck_fails!("{a = 1} : {a: Num | Dyn}");
+    assert_typecheck_fails!("({a = 1} : {a: Num | Dyn}) : {a: Num}");
 }
 
 #[test]
@@ -214,11 +209,41 @@ fn shallow_type_inference() {
         Err(TypecheckError::TypeMismatch(..))
     );
 }
-
 #[test]
 fn dynamic_record_field() {
     assert_matches!(
         type_check_expr("let x = \"foo\" in {\"#{x}\" = 1} : {foo: Num}"),
         Err(TypecheckError::TypeMismatch(..))
     );
+}
+
+#[test]
+fn dynamic_record_subtyping() {
+    assert_matches!(
+        type_check_expr("({a = 1} | {a: Num | Dyn}) : {_: Num}"),
+        Err(TypecheckError::RowTailMismatch(..))
+    );
+    assert_matches!(
+        type_check_expr("({a = \"a\"} | {a: Str | Dyn}) : {_: Num}"),
+        Err(TypecheckError::RowMismatch(..))
+    );
+    assert_typecheck_fails!("({a = 1} : {_ : Dyn}) : {_: Num}");
+    assert_typecheck_fails!("({a = \"a\"} : {_ : Str}) : {_: Num}");
+}
+
+#[test]
+fn record_ops() {
+    // Before bidirectional typechecking, %valuesOf% and %fieldsOf% used to take a `Dyn` argument,
+    // which would have accepted this program.
+    assert_typecheck_fails!("%valuesOf% [1, 2] : Dyn");
+    assert_typecheck_fails!("%fieldsOf% [1, 2] : Dyn");
+    assert_typecheck_fails!(
+        "%recordMap% (fun s x => x : Str -> Num -> Num) {foo = 1, bar = 2} : List Bool"
+    );
+}
+
+#[test]
+fn functions_subtyping() {
+    assert_typecheck_fails!("(fun x => x : Num -> Num) : Dyn -> Dyn");
+    assert_typecheck_fails!("(fun f => f 0 : (Num -> Num) -> Num) : (Dyn -> Dyn) -> Dyn");
 }

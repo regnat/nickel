@@ -509,7 +509,7 @@ subType : Types = {
         let ty = rows.into_iter()
             .chain(last.into_iter())
             // As we build row types as a linked list via a fold on the original
-            // iterator, the order of identifiers is reversed. This not a big deal
+            // iterator, the order of identifiers is reversed. This is not a big deal
             // but it's less confusing to the user to print them in the original
             // order for error reporting.
             .rev()
