@@ -178,6 +178,8 @@
           buildInputs =
             [
               rust
+              pkgs.nix
+              pkgs.boost # Implicit dependency of Nix
             ] ++ missingSysPkgs
             ++ (if isDevShell then [ pkgs.nodePackages.makam ]
             else [ cargoHome ]);

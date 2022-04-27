@@ -31,6 +31,15 @@ use std::iter::Extend;
 
 generate_counter!(FreshVariableCounter, usize);
 
+#[cxx::bridge]
+mod nix_ffi {
+    unsafe extern "C++" {
+        include!("nickel-lang/cpp/nix.hh");
+
+        fn addToStore(name: &str, content: &str) -> String;
+    }
+}
+
 /// Result of the equality of two terms.
 ///
 /// The equality of two terms can either be computed directly for base types (`Num`, `Str`, etc.),
@@ -2094,6 +2103,36 @@ fn process_binary_operation(
                     };
 
                     Ok(Closure::atomic_closure(result))
+                }
+                (Term::Str(_), _) => Err(EvalError::TypeError(
+                    String::from("Str"),
+                    String::from("strMatch, 2nd argument"),
+                    snd_pos,
+                    RichTerm {
+                        term: t2,
+                        pos: pos2,
+                    },
+                )),
+                (_, _) => Err(EvalError::TypeError(
+                    String::from("Str"),
+                    String::from("strMatch, 1st argument"),
+                    fst_pos,
+                    RichTerm {
+                        term: t1,
+                        pos: pos1,
+                    },
+                )),
+            }
+        }
+        BinaryOp::NixAddFile() => {
+            match (&*t1, &*t2) {
+                (Term::Str(s1), Term::Str(s2)) => {
+                    // let ss: [&str; 2] = [s1, s2];
+                    let resulting_path = nix_ffi::addToStore(s1, s2);
+                    Ok(Closure::atomic_closure(RichTerm::new(
+                        Term::Str(resulting_path),
+                        pos_op_inh,
+                    )))
                 }
                 (Term::Str(_), _) => Err(EvalError::TypeError(
                     String::from("Str"),

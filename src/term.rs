@@ -874,6 +874,9 @@ pub enum BinaryOp {
     /// Match a regex on a string, and returns the captured groups together, the index of the
     /// match, etc.
     StrMatch(),
+
+    /// Add a file to the Nix store
+    NixAddFile(),
 }
 
 impl BinaryOp {

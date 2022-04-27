@@ -350,6 +350,11 @@ pub fn get_bop_type(
                 ("groups", mk_typewrapper::array(AbsType::Str()))
             ),
         ),
+        BinaryOp::NixAddFile() => (
+            mk_typewrapper::str(),
+            mk_typewrapper::str(),
+            mk_typewrapper::str(),
+        ),
         // Str -> Str -> Array Str
         BinaryOp::StrSplit() => (
             mk_typewrapper::str(),
