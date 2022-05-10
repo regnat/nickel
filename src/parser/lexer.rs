@@ -261,6 +261,8 @@ pub enum NormalToken<'input> {
     EnumFromStr,
     #[token("%nix_add_file%")]
     NixAddFile,
+    #[token("%nix_derivation%")]
+    NixDerivation,
 
     #[token("{")]
     LBrace,

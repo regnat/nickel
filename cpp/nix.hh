@@ -5,12 +5,12 @@
 
 using namespace nix;
 
+struct Derivation;
+
 rust::String addToStore(const rust::Str name, const rust::Str content);
 
-/* using PrimopInfo = RegisterPrimOp::Info; */
-
-/* const std::vector<PrimopInfo> & getRegisteredPrimops(); */
-
-/* const std::string primopName(const PrimopInfo &); */
-/* const int primopArity(const PrimopInfo &); */
-/* const  primop(const PrimopInfo &); */
+// Wrapper around the `derivationStrict` nix builtin.
+//
+// The arguments are passed as json for simplicity (although that’s obviously
+// not efficient nor pretty)
+::Derivation derivation(const rust::Str jsonArgs);

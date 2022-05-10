@@ -22,7 +22,7 @@ use crate::{
     serialize,
     serialize::ExportFormat,
     term::make as mk_term,
-    term::{BinaryOp, NAryOp, RichTerm, StrChunk, Term, UnaryOp},
+    term::{BinaryOp, NAryOp, RecordAttrs, RichTerm, StrChunk, Term, UnaryOp},
     transform::Closurizable,
 };
 use md5::digest::Digest;
@@ -33,10 +33,17 @@ generate_counter!(FreshVariableCounter, usize);
 
 #[cxx::bridge]
 mod nix_ffi {
+    struct Derivation {
+        drvPath: String,
+        outPath: String,
+    }
+
     unsafe extern "C++" {
+
         include!("nickel-lang/cpp/nix.hh");
 
         fn addToStore(name: &str, content: &str) -> String;
+        fn derivation(jsonArgs: &str) -> Derivation;
     }
 }
 
@@ -986,6 +993,36 @@ fn process_unary_operation(
                 Err(EvalError::TypeError(
                     String::from("Str"),
                     String::from("strLength"),
+                    arg_pos,
+                    RichTerm { term: t, pos },
+                ))
+            }
+        }
+        UnaryOp::NixDerivation() => {
+            if let Term::Record(..) = &*t {
+                let global_env = Environment::new();
+                let rt = subst(RichTerm { term: t, pos }, &global_env, &env);
+                // let serialized_attrs = serde_json::to_string(r).unwrap();
+                serialize::validate(ExportFormat::Json, &rt)?;
+                let serialized_attrs = serialize::to_string(ExportFormat::Json, &rt)?;
+                let resulting_drv = nix_ffi::derivation(&serialized_attrs);
+                let mut drv_record_fields = std::collections::HashMap::new();
+                drv_record_fields.insert(
+                    Ident::from("drvPath"),
+                    RichTerm::new(Term::Str(resulting_drv.drvPath), pos_op_inh),
+                );
+                drv_record_fields.insert(
+                    Ident::from("outPath"),
+                    RichTerm::new(Term::Str(resulting_drv.outPath), pos_op_inh),
+                );
+                Ok(Closure::atomic_closure(RichTerm::new(
+                    Term::Record(drv_record_fields, RecordAttrs { open: false }),
+                    pos_op_inh,
+                )))
+            } else {
+                Err(EvalError::TypeError(
+                    String::from("Record"),
+                    String::from("nixDerivation"),
                     arg_pos,
                     RichTerm { term: t, pos },
                 ))

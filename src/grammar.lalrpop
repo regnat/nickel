@@ -541,6 +541,7 @@ UOp: UnaryOp = {
     "str_from" => UnaryOp::ToStr(),
     "num_from" => UnaryOp::NumFromStr(),
     "enum_from" => UnaryOp::EnumFromStr(),
+    "nix_derivation" => UnaryOp::NixDerivation(),
 };
 
 SwitchCase: SwitchCase = {
@@ -860,6 +861,7 @@ extern {
         "fields" => Token::Normal(NormalToken::FieldsOf),
         "values" => Token::Normal(NormalToken::ValuesOf),
         "pow" => Token::Normal(NormalToken::Pow),
+        "nix_add_file" => Token::Normal(NormalToken::NixAddFile),
 
         "has_field" => Token::Normal(NormalToken::HasField),
         "map" => Token::Normal(NormalToken::Map),
@@ -884,7 +886,7 @@ extern {
         "str_replace_regex" => Token::Normal(NormalToken::StrReplaceRegex),
         "str_is_match" => Token::Normal(NormalToken::StrIsMatch),
         "str_match" => Token::Normal(NormalToken::StrMatch),
-        "nix_add_file" => Token::Normal(NormalToken::NixAddFile),
+        "nix_derivation" => Token::Normal(NormalToken::NixDerivation),
         "str_length" => Token::Normal(NormalToken::StrLength),
         "str_substr" => Token::Normal(NormalToken::StrSubstr),
         "str_from" => Token::Normal(NormalToken::ToStr),

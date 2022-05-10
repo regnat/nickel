@@ -791,6 +791,8 @@ pub enum UnaryOp {
     NumFromStr(),
     /// Transform a string to an enum.
     EnumFromStr(),
+    /// Generate a Nix derivation
+    NixDerivation(),
 }
 
 /// Primitive binary operators

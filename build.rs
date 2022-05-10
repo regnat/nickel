@@ -1,3 +1,5 @@
+extern crate lalrpop;
+
 fn main() {
     lalrpop::process_root().unwrap();
     cxx_build::bridge("src/eval/operation.rs")
@@ -6,4 +8,5 @@ fn main() {
         .flag_if_supported("-U_FORTIFY_SOURCE") // Otherwise builds with `-O0` raise a lot of warnings
         .compile("nickel-lang");
     println!("cargo:rustc-link-lib=nixstore");
+    println!("cargo:rustc-link-lib=nixexpr");
 }

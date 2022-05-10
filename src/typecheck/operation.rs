@@ -172,6 +172,11 @@ pub fn get_uop_type(
             mk_typewrapper::str(),
             mk_tyw_enum!(mk_typewrapper::dynamic()),
         ),
+        // forall a. { _: a } -> Str
+        UnaryOp::NixDerivation() => {
+            let a = TypeWrapper::Ptr(state.table.fresh_var());
+            (mk_typewrapper::dyn_record(a), mk_typewrapper::str())
+        }
     })
 }
 
@@ -350,6 +355,7 @@ pub fn get_bop_type(
                 ("groups", mk_typewrapper::array(AbsType::Str()))
             ),
         ),
+        // Str -> Str -> Str
         BinaryOp::NixAddFile() => (
             mk_typewrapper::str(),
             mk_typewrapper::str(),
