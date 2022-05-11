@@ -231,6 +231,7 @@ pub struct MetaValue {
     pub contracts: Vec<Contract>,
     pub priority: MergePriority,
     pub value: Option<RichTerm>,
+    pub context: Vec<RichTerm>,
 }
 
 impl From<RichTerm> for MetaValue {
@@ -241,6 +242,7 @@ impl From<RichTerm> for MetaValue {
             contracts: Vec::new(),
             priority: Default::default(),
             value: Some(rt),
+            context: Vec::new(),
         }
     }
 }
@@ -259,6 +261,7 @@ impl MetaValue {
             contracts: Vec::new(),
             priority: Default::default(),
             value: None,
+            context: Vec::new(),
         }
     }
 
@@ -285,6 +288,7 @@ impl MetaValue {
             mut contracts,
             priority,
             value: _,
+            mut context,
         } = outer;
 
         if types.is_some() {
@@ -298,6 +302,7 @@ impl MetaValue {
         }
 
         contracts.extend(inner.contracts.into_iter());
+        context.extend(inner.context.into_iter());
 
         MetaValue {
             doc: doc.or(inner.doc),
@@ -305,6 +310,7 @@ impl MetaValue {
             contracts,
             priority: std::cmp::min(priority, inner.priority),
             value: inner.value,
+            context,
         }
     }
 }
@@ -1172,12 +1178,21 @@ impl RichTerm {
                     .value
                     .map(|t| t.traverse(f, state, order))
                     .map_or(Ok(None), |res| res.map(Some))?;
+
+                let maybe_context : Result<Vec<RichTerm>, _> = meta
+                    .context
+                    .into_iter()
+                    .map(|t| t.traverse(f, state, order))
+                    .collect();
+                let context = maybe_context?;
+
                     let meta = MetaValue {
                         doc: meta.doc,
                         types,
                         contracts,
                         priority: meta.priority,
                         value,
+                        context,
                     };
 
                 RichTerm::new(

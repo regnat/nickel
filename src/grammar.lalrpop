@@ -98,13 +98,15 @@ AnnotAtom<TypeRule>: MetaValue = {
         contracts: vec![Contract {types: ty.clone(), label: mk_label(ty, src_id, l, r)}],
         priority: Default::default(),
         value: None,
+        context: Vec::default(),
     },
     "|" "default" => MetaValue {
         doc: None,
         types: None,
         contracts: Vec::new(),
         priority: MergePriority::Default,
-        value: None
+        value: None,
+        context: Vec::default(),
     },
     "|" "doc" <s: StaticString> => MetaValue {
         doc: Some(strip_indent_doc(s)),
@@ -112,6 +114,7 @@ AnnotAtom<TypeRule>: MetaValue = {
         contracts: Vec::new(),
         priority: Default::default(),
         value: None,
+        context: Vec::default(),
     },
     ":" <l: @L> <ty: TypeRule> <r: @R> => MetaValue {
         doc: None,
@@ -119,6 +122,7 @@ AnnotAtom<TypeRule>: MetaValue = {
         contracts: Vec::new(),
         priority: Default::default(),
         value: None,
+        context: Vec::default(),
     },
 };
 

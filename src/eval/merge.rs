@@ -237,6 +237,7 @@ pub fn merge(
                 contracts: contracts1,
                 priority: priority1,
                 value: value1,
+                context: context1,
             } = meta1;
             let MetaValue {
                 doc: doc2,
@@ -244,6 +245,7 @@ pub fn merge(
                 contracts: contracts2,
                 priority: priority2,
                 value: value2,
+                context: context2,
             } = meta2;
 
             let doc = merge_doc(doc1, doc2);
@@ -335,12 +337,14 @@ pub fn merge(
                 .into_iter()
                 .chain(contracts2.into_iter())
                 .collect();
+            let context: Vec<_> = context1.into_iter().chain(context2.into_iter()).collect();
             let meta = MetaValue {
                 doc,
                 types,
                 contracts,
                 priority,
                 value,
+                context,
             };
 
             Ok(Closure {
